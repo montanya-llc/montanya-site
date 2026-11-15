@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Montanya Mechanical | Research &amp; Development, Design Services</title>
+<meta name="description" content="Montanya Mechanical (Montanya LLC) offers research and development, design services, prototyping, and mechatronics. Contact info@montanya.us for a quote.">
+<link rel="icon" type="image/png" href="favicon.png">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #fdfbf7;
+    --text: #2b2728;
+    --muted: #6b6566;
+    --red: #b8232f;
+    --red-dark: #961b26;
+    --card: #f6f2ea;
+    --line: #e2dcd2;
+    --serif: "EB Garamond", Garamond, "Cormorant Garamond", Georgia, "Times New Roman", serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+    color: var(--text);
+    background: var(--bg);
+  }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 0 16px; }
+  a { color: var(--red); }
+
+  header { background: #fff; border-bottom: 3px solid var(--text); }
+  header .wrap { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; padding-top: 10px; padding-bottom: 10px; }
+  .logo { display: block; height: 96px; width: auto; }
+  @media (max-width: 560px) { .logo { height: 76px; } }
+  nav a {
+    margin-left: 20px;
+    color: var(--text);
+    text-decoration: none;
+    font-family: var(--serif);
+    font-size: 1.05rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  nav a:hover { color: var(--red); }
+
+  .hero { padding: 56px 0 24px; }
+  h1 {
+    font-family: var(--serif);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    line-height: 1.1;
+    margin: 0 0 16px;
+  }
+  h1 .big { display: block; font-size: 2.4rem; }
+  h1 .small { display: block; font-size: 1.15rem; margin-top: 10px; letter-spacing: 0.18em; color: var(--muted); }
+  h2 {
+    font-family: var(--serif);
+    font-weight: 500;
+    font-size: 1.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin: 48px 0 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--line);
+  }
+  p { margin: 0 0 12px; }
+  .muted { color: var(--muted); }
+
+  .btn {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 11px 24px;
+    border-radius: 3px;
+    background: var(--red);
+    color: #fff;
+    text-decoration: none;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+  .btn:hover { background: var(--red-dark); }
+
+  .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+  .card { background: var(--card); border: 1px solid var(--line); border-top: 3px solid var(--red); border-radius: 3px; padding: 16px; }
+  .card h3 { font-family: var(--serif); font-size: 1.15rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; margin: 0 0 6px; }
+  .card p { margin: 0; color: var(--muted); font-size: 0.95rem; }
+  .ph { position: relative; height: 160px; border-radius: 2px; background: var(--line); margin-bottom: 12px; overflow: hidden; }
+  .ph .cap { position: absolute; right: 6px; bottom: 6px; background: rgba(0,0,0,.6); color: #fff; font-size: 0.7rem; padding: 1px 6px; border-radius: 2px; }
+  .ph img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center 60%; }
+
+  .contact p { margin: 4px 0; }
+  .contact .big { font-size: 1.15rem; }
+
+  footer { border-top: 3px solid var(--text); margin-top: 56px; padding: 20px 0; color: var(--muted); font-size: 0.9rem; background: #fff; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <a href="index.html"><img class="logo" src="logo.png" alt="Montanya Mechanical"></a>
+    <nav>
+      <a href="#services">Services</a>
+      <a href="#work">Work</a>
+      <a href="about.html">About</a>
+      <a href="#contact">Contact</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="hero">
+    <h1><span class="big">Research and development</span><span class="small">Design services</span></h1>
+    <p class="muted">From analysis of welded fixtures to custom hardware and embedded electronics, Montanya Mechanical takes projects from concept to a working part.</p>
+    <a class="btn" href="mailto:info@montanya.us?subject=Quote%20request">Request a quote</a>
+  </section>
+
+  <section id="services">
+    <h2>What we do</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Prototyping</h3>
+        <p>Fast iteration from sketch to a working part you can hold and test. Can also assist with procuring, supplying, and outsourcing.</p>
+      </div>
+      <div class="card">
+        <h3>3D printing &amp; CNC</h3>
+        <p>One-off parts and prototypes, from printed plastic to machined components.</p>
+      </div>
+      <div class="card">
+        <h3>Engineering drawings</h3>
+        <p>Dimensioned drawings and models, including parts reverse-engineered from 3D scans.</p>
+      </div>
+      <div class="card">
+        <h3>Analysis</h3>
+        <p>Mechanical strength, vibrations, dynamics, FEA, and fluid dynamics.</p>
+      </div>
+      <div class="card">
+        <h3>Mechatronics</h3>
+        <p>Mechanical, electronic, and embedded systems designed together, including custom PCBs and farm and equipment automation.</p>
+      </div>
+      <div class="card">
+        <h3>Research</h3>
+        <p>Researching and developing novel solutions, reverse engineering, and problem-solving for challenges that don't fit a catalog part.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="work">
+    <h2>Selected work</h2>
+    <div class="grid">
+      <div class="card">
+        <div class="ph"><img src="photos/welded-ramp-truss.jpg" alt="Illustrative image of loading ramps" loading="lazy" onerror="this.remove()"><span class="cap">Illustrative image</span></div>
+        <h3>Welded ramp truss analysis</h3>
+        <p>Analyzed and advised on a welded steel square-tube loading ramp truss designed by others, with load analysis and member and weld checks to a conservative safety factor.</p>
+      </div>
+      <div class="card">
+        <div class="ph"><img src="photos/prototype-enclosures.jpg" alt="3D printer used for prototype electronics enclosures" loading="lazy" onerror="this.remove()"></div>
+        <h3>Prototype enclosures</h3>
+        <p>Designed and 3D printed enclosures for prototype electronics, with quick iteration on fit and mounting.</p>
+      </div>
+      <div class="card">
+        <div class="ph"><img src="photos/cnc-cutting.jpg" alt="Small custom magnetic closure ring box being cut on a CNC router" loading="lazy" onerror="this.remove()"></div>
+        <h3>CNC cutting</h3>
+        <p>Custom CNC work, like the small magnetic closure ring box shown. Also drill jigs, signs, and aluminum parts. All of this was done in house on a large-format 3' x 3' CNC router; more complex work is outsourced to machine shops.</p>
+      </div>
+      <div class="card">
+        <div class="ph"><img src="photos/carbon-fiber-finishing.jpg" alt="Close-up of twill weave carbon fiber" loading="lazy" onerror="this.nextElementSibling.remove();this.remove()"><span class="cap">Illustrative image</span></div>
+        <h3>Carbon fiber part finishing</h3>
+        <p>Finishing of carbon fiber parts. This job was a manual setup, and the same work can also be done with CNC.</p>
+      </div>
+      <div class="card">
+        <div class="ph"><img src="photos/eco-friendly-products.jpg" alt="3D printed household strainer bowls" loading="lazy" onerror="this.remove()"></div>
+        <h3>Eco-friendly products</h3>
+        <p>Designed and 3D printed household products, sold through our Etsy shop.</p>
+      </div>
+      <div class="card">
+        <div class="ph"><img src="photos/patent-pending-outdoor-product.jpg" alt="Alpine lake in the mountains" loading="lazy" onerror="this.remove()"></div>
+        <h3>Patent-pending outdoor product</h3>
+        <p>Developed a novel outdoor product, now patent pending. Parts were fabricated in house and the PCBs were outsourced, then assembled and put through field and durability testing. Low-run prototypes were built for customer evaluation.</p>
+      </div>
+    </div>
+    <p class="muted" style="margin-top:12px;">More examples and references available on request.</p>
+  </section>
+
+
+  <section id="contact" class="contact">
+    <h2>Contact</h2>
+    <p>For a quote or to discuss a project, email <a href="mailto:info@montanya.us?subject=Quote%20request">info@montanya.us</a>. A short description of the project, any drawings or photos, and your timeline is plenty to get started.</p>
+    <p class="muted">Based in Bremerton, Washington</p>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">&copy; 2026 Montanya LLC, DBA Montanya Mechanical. Single-member LLC owned and operated by Alex Read. Montanya LLC does not provide professional engineering services at this time and will decline such requests.</div>
+</footer>
+
+</body>
+</html>
