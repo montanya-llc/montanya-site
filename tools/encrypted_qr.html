@@ -21,11 +21,10 @@
   .label { font-weight: 600; margin-bottom: .2rem; }
   .code svg { width: 100%; max-width: 640px; height: auto; display: block; }
   .small { font-size: .85rem; color: #666; }
-  details { margin-top: 1.5rem; }
   #plain { white-space: pre-wrap; margin-top: .6rem; padding: .5rem; background: #f3f3f3; min-height: 1.5rem; }
   #plain.bad { color: #b00020; }
   @media print {
-    textarea, .bar, .status, #warning, h1, h2, p, details, #scanBox { display: none; }
+    textarea, .bar, .status, #warning, h1, h2, p, #plain, #scanBox { display: none; }
     body { margin: 0; max-width: none; padding: 0; }
     .code { break-after: page; margin: 0; }
     .code svg { width: 14cm; max-width: none; }
@@ -64,17 +63,15 @@
 </p>
 <p class="small">CTRL+P prints each code on its own page.</p>
 
-<details>
-  <summary>Decrypt</summary>
-  <p class="small">Uses the key above. Scan the encrypted note code with the camera, or paste its text here.</p>
-  <textarea id="cipherIn" placeholder="Encrypted note text"></textarea>
-  <div class="bar" id="decBar">
-    <button type="button" id="decrypt">Decrypt</button>
-    <button type="button" id="scanNote">Scan encrypted note with camera</button>
-  </div>
-  <div class="status" id="decStatus"></div>
-  <div id="plain"></div>
-</details>
+<h2>3. Decrypt</h2>
+<textarea id="cipherIn" placeholder="Paste the encrypted note text here, or scan its code. It uses the key above."></textarea>
+<div class="bar" id="decBar">
+  <button type="button" id="pasteNote">Paste text</button>
+  <button type="button" id="scanNote">Scan encrypted note with camera</button>
+  <button type="button" id="decrypt">Decrypt</button>
+</div>
+<div class="status" id="decStatus"></div>
+<div id="plain"></div>
 
 <script src="jsQR.js"></script>
 <script>
@@ -497,6 +494,15 @@ if (typeof document !== 'undefined') (function () {
     catch (e) { out.textContent = e.message; out.className = 'bad'; }
   }
   $('decrypt').addEventListener('click', runDecrypt);
+  let decTimer;   // decrypts by itself shortly after text is pasted or typed into the box
+  $('cipherIn').addEventListener('input', () => {
+    clearTimeout(decTimer);
+    decTimer = setTimeout(() => { if ($('cipherIn').value.trim()) runDecrypt(); else $('plain').textContent = ''; }, 400);
+  });
+  $('pasteNote').addEventListener('click', async () => {
+    try { $('cipherIn').value = await navigator.clipboard.readText(); runDecrypt(); }
+    catch (e) { say($('decStatus'), 'Could not read the clipboard. Paste into the box instead.', true); }
+  });
 
   check();
 })();
