@@ -16,6 +16,7 @@
   #warning { font-size: .9rem; }
   .bar { margin-top: .5rem; display: flex; gap: .5rem; flex-wrap: wrap; }
   button { font: inherit; padding: .5rem .9rem; }
+  #video { width: 100%; max-width: 420px; display: block; margin-top: .5rem; background: #000; }
   .code { margin-top: .8rem; }
   .label { font-weight: 600; margin-bottom: .2rem; }
   .code svg { width: 100%; max-width: 640px; height: auto; display: block; }
@@ -24,7 +25,7 @@
   #plain { white-space: pre-wrap; margin-top: .6rem; padding: .5rem; background: #f3f3f3; min-height: 1.5rem; }
   #plain.bad { color: #b00020; }
   @media print {
-    textarea, .bar, .status, #warning, h1, h2, p, details { display: none; }
+    textarea, .bar, .status, #warning, h1, h2, p, details, #scanBox { display: none; }
     body { margin: 0; max-width: none; padding: 0; }
     .code { break-after: page; margin: 0; }
     .code svg { width: 14cm; max-width: none; }
@@ -38,6 +39,11 @@
 <textarea id="key" placeholder="Generate a new key, or paste an existing one."></textarea>
 <div class="bar">
   <button type="button" id="newKey">Generate new key</button>
+  <button type="button" id="scanKey">Scan key with camera</button>
+</div>
+<div id="scanBox" hidden>
+  <video id="video" playsinline muted></video>
+  <div class="bar"><button type="button" id="stopScan">Cancel scan</button></div>
 </div>
 <div class="status" id="keyStatus"></div>
 <div id="keyCode"></div>
@@ -66,6 +72,7 @@
   <div id="plain"></div>
 </details>
 
+<script src="jsQR.js"></script>
 <script>
 const ALNUM = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:';   // what a QR code can hold
 
@@ -387,7 +394,56 @@ if (typeof document !== 'undefined') (function () {
     } catch (e) { $('keyCode').innerHTML = ''; say(keyStatus, 'Key is too long for a QR code.', true); }
   }
 
-  $('newKey').addEventListener('click', () => { keyBox.value = randomKeyText(); showKey(); });
+  $('newKey').addEventListener('click', () => { stopScan(); keyBox.value = randomKeyText(); showKey(); });
+
+  // ---- Scan an old key code with the camera (all in this page; no picture is saved or sent) ----
+  let stream = null, scanning = false;
+  const frame = document.createElement('canvas'), fctx = frame.getContext('2d', { willReadFrequently: true });
+
+  function stopScan() {
+    scanning = false;
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    $('video').srcObject = null;
+    $('scanBox').hidden = true;
+  }
+
+  async function startScan() {
+    stopScan();
+    if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia))
+      return say(keyStatus, 'This browser cannot use the camera on this page. Open it over https://.', true);
+    if (typeof jsQR !== 'function') return say(keyStatus, 'The QR reader did not load. Reload the page.', true);
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+    } catch (e) {
+      return say(keyStatus, e.name === 'NotAllowedError' ? 'Camera permission was denied.' : 'Could not open the camera.', true);
+    }
+    const video = $('video');
+    video.srcObject = stream;
+    await video.play();
+    $('scanBox').hidden = false;
+    scanning = true;
+    say(keyStatus, 'Point the camera at the key QR code.');
+    (function tick() {
+      if (!scanning) return;
+      if (video.readyState >= 2 && video.videoWidth) {
+        const w = video.videoWidth, h = video.videoHeight;
+        frame.width = w; frame.height = h;
+        fctx.drawImage(video, 0, 0, w, h);
+        const hit = jsQR(fctx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: 'dontInvert' });
+        if (hit && hit.data) {
+          stopScan();
+          keyBox.value = cleanKey(hit.data);
+          showKey();
+          keyStatus.textContent = 'Key imported from the camera. ' + keyStatus.textContent;
+          return;
+        }
+      }
+      requestAnimationFrame(tick);
+    })();
+  }
+
+  $('scanKey').addEventListener('click', startScan);
+  $('stopScan').addEventListener('click', () => { stopScan(); say(keyStatus, ''); });
   keyBox.addEventListener('input', () => { clearTimeout(keyTimer); keyTimer = setTimeout(showKey, 200); });
 
   function check() {   // live "does it fit" check for the note
