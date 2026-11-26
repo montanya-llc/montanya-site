@@ -37,7 +37,7 @@
 
 <h2>1. Key</h2>
 <textarea id="key" placeholder="Generate a new key, or paste an existing one."></textarea>
-<div class="bar">
+<div class="bar" id="keyBar">
   <button type="button" id="newKey">Generate new key</button>
   <button type="button" id="scanKey">Scan key with camera</button>
 </div>
@@ -66,9 +66,13 @@
 
 <details>
   <summary>Decrypt</summary>
-  <p class="small">Uses the key above. Scan the encrypted note code and paste its text here.</p>
+  <p class="small">Uses the key above. Scan the encrypted note code with the camera, or paste its text here.</p>
   <textarea id="cipherIn" placeholder="Encrypted note text"></textarea>
-  <div class="bar"><button type="button" id="decrypt">Decrypt</button></div>
+  <div class="bar" id="decBar">
+    <button type="button" id="decrypt">Decrypt</button>
+    <button type="button" id="scanNote">Scan encrypted note with camera</button>
+  </div>
+  <div class="status" id="decStatus"></div>
   <div id="plain"></div>
 </details>
 
@@ -396,7 +400,8 @@ if (typeof document !== 'undefined') (function () {
 
   $('newKey').addEventListener('click', () => { stopScan(); keyBox.value = randomKeyText(); showKey(); });
 
-  // ---- Scan an old key code with the camera (all in this page; no picture is saved or sent) ----
+  // ---- Scan a QR code with the camera (all in this page; no picture is saved or sent) ----
+  // kind 'key' fills the key box; kind 'note' fills the Decrypt box and decrypts.
   let stream = null, scanning = false;
   const frame = document.createElement('canvas'), fctx = frame.getContext('2d', { willReadFrequently: true });
 
@@ -407,22 +412,24 @@ if (typeof document !== 'undefined') (function () {
     $('scanBox').hidden = true;
   }
 
-  async function startScan() {
+  async function startScan(kind) {
     stopScan();
+    const info = kind === 'key' ? keyStatus : $('decStatus');
+    $((kind === 'key') ? 'keyBar' : 'decBar').after($('scanBox'));   // show the camera next to the button used
     if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia))
-      return say(keyStatus, 'This browser cannot use the camera on this page. Open it over https://.', true);
-    if (typeof jsQR !== 'function') return say(keyStatus, 'The QR reader did not load. Reload the page.', true);
+      return say(info, 'This browser cannot use the camera on this page. Open it over https://.', true);
+    if (typeof jsQR !== 'function') return say(info, 'The QR reader did not load. Reload the page.', true);
     try {
       stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
     } catch (e) {
-      return say(keyStatus, e.name === 'NotAllowedError' ? 'Camera permission was denied.' : 'Could not open the camera.', true);
+      return say(info, e.name === 'NotAllowedError' ? 'Camera permission was denied.' : 'Could not open the camera.', true);
     }
     const video = $('video');
     video.srcObject = stream;
     await video.play();
     $('scanBox').hidden = false;
     scanning = true;
-    say(keyStatus, 'Point the camera at the key QR code.');
+    say(info, kind === 'key' ? 'Point the camera at the key QR code.' : 'Point the camera at the encrypted note QR code.');
     (function tick() {
       if (!scanning) return;
       if (video.readyState >= 2 && video.videoWidth) {
@@ -432,9 +439,15 @@ if (typeof document !== 'undefined') (function () {
         const hit = jsQR(fctx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: 'dontInvert' });
         if (hit && hit.data) {
           stopScan();
-          keyBox.value = cleanKey(hit.data);
-          showKey();
-          keyStatus.textContent = 'Key imported from the camera. ' + keyStatus.textContent;
+          if (kind === 'key') {
+            keyBox.value = cleanKey(hit.data);
+            showKey();
+            keyStatus.textContent = 'Key imported from the camera. ' + keyStatus.textContent;
+          } else {
+            $('cipherIn').value = hit.data;
+            say(info, 'Encrypted note scanned.');
+            runDecrypt();
+          }
           return;
         }
       }
@@ -442,8 +455,9 @@ if (typeof document !== 'undefined') (function () {
     })();
   }
 
-  $('scanKey').addEventListener('click', startScan);
-  $('stopScan').addEventListener('click', () => { stopScan(); say(keyStatus, ''); });
+  $('scanKey').addEventListener('click', () => startScan('key'));
+  $('scanNote').addEventListener('click', () => startScan('note'));
+  $('stopScan').addEventListener('click', () => { stopScan(); say(keyStatus, ''); say($('decStatus'), ''); });
   keyBox.addEventListener('input', () => { clearTimeout(keyTimer); keyTimer = setTimeout(showKey, 200); });
 
   function check() {   // live "does it fit" check for the note
@@ -477,11 +491,12 @@ if (typeof document !== 'undefined') (function () {
   });
   noteBox.addEventListener('input', () => { clearTimeout(noteTimer); noteTimer = setTimeout(check, 150); });
 
-  $('decrypt').addEventListener('click', async () => {
+  async function runDecrypt() {
     const out = $('plain');
     try { out.textContent = await decryptNote(cleanKey(keyBox.value), $('cipherIn').value); out.className = ''; }
     catch (e) { out.textContent = e.message; out.className = 'bad'; }
-  });
+  }
+  $('decrypt').addEventListener('click', runDecrypt);
 
   check();
 })();
