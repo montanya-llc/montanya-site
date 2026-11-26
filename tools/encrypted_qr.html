@@ -9,7 +9,7 @@
   body { font-family: system-ui, sans-serif; max-width: 680px; margin: 1.5rem auto; padding: 0 1rem; }
   h2 { font-size: 1.1rem; margin: 1.6rem 0 .4rem; }
   textarea { width: 100%; box-sizing: border-box; font: inherit; padding: .5rem; }
-  #key, #cipherIn { height: 4.5rem; font-family: ui-monospace, monospace; font-size: .9rem; }
+  #key, #decKey, #cipherIn { height: 4.5rem; font-family: ui-monospace, monospace; font-size: .9rem; }
   #note { height: 9rem; }
   .status { margin: .4rem 0 .2rem; color: #444; font-size: .9rem; }
   .status.bad, #warning { color: #b00020; }
@@ -21,10 +21,11 @@
   .label { font-weight: 600; margin-bottom: .2rem; }
   .code svg { width: 100%; max-width: 640px; height: auto; display: block; }
   .small { font-size: .85rem; color: #666; }
+  details { margin-top: 1.5rem; }
   #plain { white-space: pre-wrap; margin-top: .6rem; padding: .5rem; background: #f3f3f3; min-height: 1.5rem; }
   #plain.bad { color: #b00020; }
   @media print {
-    textarea, .bar, .status, #warning, h1, h2, p, #plain, #scanBox { display: none; }
+    textarea, .bar, .status, #warning, h1, h2, p, details, #scanBox { display: none; }
     body { margin: 0; max-width: none; padding: 0; }
     .code { break-after: page; margin: 0; }
     .code svg { width: 14cm; max-width: none; }
@@ -63,15 +64,20 @@
 </p>
 <p class="small">CTRL+P prints each code on its own page.</p>
 
-<h2>3. Decrypt</h2>
-<textarea id="cipherIn" placeholder="Paste the encrypted note text here, or scan its code. It uses the key above."></textarea>
-<div class="bar" id="decBar">
-  <button type="button" id="pasteNote">Paste text</button>
-  <button type="button" id="scanNote">Scan encrypted note with camera</button>
-  <button type="button" id="decrypt">Decrypt</button>
-</div>
-<div class="status" id="decStatus"></div>
-<div id="plain"></div>
+<details>
+  <summary>Decrypt</summary>
+  <textarea id="decKey" placeholder="Paste the key here, or scan its code."></textarea>
+  <div class="bar" id="decKeyBar">
+    <button type="button" id="scanDecKey">Scan key with camera</button>
+  </div>
+  <textarea id="cipherIn" placeholder="Paste the encrypted note text here, or scan its code."></textarea>
+  <div class="bar" id="decBar">
+    <button type="button" id="scanNote">Scan encrypted note with camera</button>
+    <button type="button" id="decrypt">Decrypt</button>
+  </div>
+  <div class="status" id="decStatus"></div>
+  <div id="plain"></div>
+</details>
 
 <script src="jsQR.js"></script>
 <script>
@@ -398,7 +404,7 @@ if (typeof document !== 'undefined') (function () {
   $('newKey').addEventListener('click', () => { stopScan(); keyBox.value = randomKeyText(); showKey(); });
 
   // ---- Scan a QR code with the camera (all in this page; no picture is saved or sent) ----
-  // kind 'key' fills the key box; kind 'note' fills the Decrypt box and decrypts.
+  // 'key' fills the key box; 'dkey' fills the Decrypt key box; 'note' fills the note box and decrypts.
   let stream = null, scanning = false;
   const frame = document.createElement('canvas'), fctx = frame.getContext('2d', { willReadFrequently: true });
 
@@ -411,8 +417,8 @@ if (typeof document !== 'undefined') (function () {
 
   async function startScan(kind) {
     stopScan();
-    const info = kind === 'key' ? keyStatus : $('decStatus');
-    $((kind === 'key') ? 'keyBar' : 'decBar').after($('scanBox'));   // show the camera next to the button used
+    const info = kind === 'key' ? keyStatus : $('decStatus');   // kinds: key, dkey (Decrypt key), note
+    $({ key: 'keyBar', dkey: 'decKeyBar', note: 'decBar' }[kind]).after($('scanBox'));   // show the camera next to the button used
     if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia))
       return say(info, 'This browser cannot use the camera on this page. Open it over https://.', true);
     if (typeof jsQR !== 'function') return say(info, 'The QR reader did not load. Reload the page.', true);
@@ -426,7 +432,7 @@ if (typeof document !== 'undefined') (function () {
     await video.play();
     $('scanBox').hidden = false;
     scanning = true;
-    say(info, kind === 'key' ? 'Point the camera at the key QR code.' : 'Point the camera at the encrypted note QR code.');
+    say(info, 'Point the camera at the ' + (kind === 'note' ? 'encrypted note' : 'key') + ' QR code.');
     (function tick() {
       if (!scanning) return;
       if (video.readyState >= 2 && video.videoWidth) {
@@ -440,6 +446,9 @@ if (typeof document !== 'undefined') (function () {
             keyBox.value = cleanKey(hit.data);
             showKey();
             keyStatus.textContent = 'Key imported from the camera. ' + keyStatus.textContent;
+          } else if (kind === 'dkey') {
+            $('decKey').value = cleanKey(hit.data);
+            say(info, 'Key scanned.');
           } else {
             $('cipherIn').value = hit.data;
             say(info, 'Encrypted note scanned.');
@@ -453,6 +462,7 @@ if (typeof document !== 'undefined') (function () {
   }
 
   $('scanKey').addEventListener('click', () => startScan('key'));
+  $('scanDecKey').addEventListener('click', () => startScan('dkey'));
   $('scanNote').addEventListener('click', () => startScan('note'));
   $('stopScan').addEventListener('click', () => { stopScan(); say(keyStatus, ''); say($('decStatus'), ''); });
   keyBox.addEventListener('input', () => { clearTimeout(keyTimer); keyTimer = setTimeout(showKey, 200); });
@@ -490,19 +500,10 @@ if (typeof document !== 'undefined') (function () {
 
   async function runDecrypt() {
     const out = $('plain');
-    try { out.textContent = await decryptNote(cleanKey(keyBox.value), $('cipherIn').value); out.className = ''; }
+    try { out.textContent = await decryptNote(cleanKey($('decKey').value), $('cipherIn').value); out.className = ''; }
     catch (e) { out.textContent = e.message; out.className = 'bad'; }
   }
   $('decrypt').addEventListener('click', runDecrypt);
-  let decTimer;   // decrypts by itself shortly after text is pasted or typed into the box
-  $('cipherIn').addEventListener('input', () => {
-    clearTimeout(decTimer);
-    decTimer = setTimeout(() => { if ($('cipherIn').value.trim()) runDecrypt(); else $('plain').textContent = ''; }, 400);
-  });
-  $('pasteNote').addEventListener('click', async () => {
-    try { $('cipherIn').value = await navigator.clipboard.readText(); runDecrypt(); }
-    catch (e) { say($('decStatus'), 'Could not read the clipboard. Paste into the box instead.', true); }
-  });
 
   check();
 })();
