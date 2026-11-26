@@ -9,7 +9,7 @@
   body { font-family: system-ui, sans-serif; max-width: 680px; margin: 1.5rem auto; padding: 0 1rem; }
   h2 { font-size: 1.1rem; margin: 1.6rem 0 .4rem; }
   textarea { width: 100%; box-sizing: border-box; font: inherit; padding: .5rem; }
-  #key, #decKey, #cipherIn { height: 4.5rem; font-family: ui-monospace, monospace; font-size: .9rem; }
+  #key, #decKey { height: 4.5rem; font-family: ui-monospace, monospace; font-size: .9rem; }
   #note { height: 9rem; }
   .status { margin: .4rem 0 .2rem; color: #444; font-size: .9rem; }
   .status.bad, #warning { color: #b00020; }
@@ -70,10 +70,8 @@
   <div class="bar" id="decKeyBar">
     <button type="button" id="scanDecKey">Scan key with camera</button>
   </div>
-  <textarea id="cipherIn" placeholder="Paste the encrypted note text here, or scan its code."></textarea>
   <div class="bar" id="decBar">
     <button type="button" id="scanNote">Scan encrypted note with camera</button>
-    <button type="button" id="decrypt">Decrypt</button>
   </div>
   <div class="status" id="decStatus"></div>
   <div id="plain"></div>
@@ -404,7 +402,7 @@ if (typeof document !== 'undefined') (function () {
   $('newKey').addEventListener('click', () => { stopScan(); keyBox.value = randomKeyText(); showKey(); });
 
   // ---- Scan a QR code with the camera (all in this page; no picture is saved or sent) ----
-  // 'key' fills the key box; 'dkey' fills the Decrypt key box; 'note' fills the note box and decrypts.
+  // 'key' fills the key box; 'dkey' fills the Decrypt key box; 'note' decrypts the scanned note.
   let stream = null, scanning = false;
   const frame = document.createElement('canvas'), fctx = frame.getContext('2d', { willReadFrequently: true });
 
@@ -450,9 +448,8 @@ if (typeof document !== 'undefined') (function () {
             $('decKey').value = cleanKey(hit.data);
             say(info, 'Key scanned.');
           } else {
-            $('cipherIn').value = hit.data;
             say(info, 'Encrypted note scanned.');
-            runDecrypt();
+            decrypt(hit.data);
           }
           return;
         }
@@ -498,12 +495,11 @@ if (typeof document !== 'undefined') (function () {
   });
   noteBox.addEventListener('input', () => { clearTimeout(noteTimer); noteTimer = setTimeout(check, 150); });
 
-  async function runDecrypt() {
+  async function decrypt(cipherText) {
     const out = $('plain');
-    try { out.textContent = await decryptNote(cleanKey($('decKey').value), $('cipherIn').value); out.className = ''; }
+    try { out.textContent = await decryptNote(cleanKey($('decKey').value), cipherText); out.className = ''; }
     catch (e) { out.textContent = e.message; out.className = 'bad'; }
   }
-  $('decrypt').addEventListener('click', runDecrypt);
 
   check();
 })();
