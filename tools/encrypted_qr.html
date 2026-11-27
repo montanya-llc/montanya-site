@@ -9,7 +9,7 @@
   body { font-family: system-ui, sans-serif; max-width: 680px; margin: 1.5rem auto; padding: 0 1rem; }
   h2 { font-size: 1.1rem; margin: 1.6rem 0 .4rem; }
   textarea { width: 100%; box-sizing: border-box; font: inherit; padding: .5rem; }
-  #key, #decKey { height: 4.5rem; font-family: ui-monospace, monospace; font-size: .9rem; }
+  #key, #decKey { text-transform: uppercase; height: 4.5rem; font-family: ui-monospace, monospace; font-size: .9rem; }
   #note { height: 9rem; }
   .status { margin: .4rem 0 .2rem; color: #444; font-size: .9rem; }
   .status.bad, #warning { color: #b00020; }
@@ -36,8 +36,9 @@
 <h1>Encrypted QR</h1>
 
 <h2>1. Key</h2>
+<p class="small">At least 8 characters: letters, digits, space and $ % * + - . / :</p>
 <textarea id="key" placeholder="Generate a new key, or paste an existing one."></textarea>
-<div class="bar" id="keyBar">
+<div class="bar">
   <button type="button" id="newKey">Generate new key</button>
   <button type="button" id="scanKey">Scan key with camera</button>
 </div>
@@ -57,20 +58,15 @@
 <div id="warning"></div>
 <div id="noteCode"></div>
 
-<p class="small">
-  The key can be new or one you already use. Each note gets its own random salt and nonce, so one key is
-  safe for many notes. Anyone with the key and the encrypted note can read it, so keep the two codes apart.
-  Lose the key and the note cannot be recovered. Everything runs in this page; nothing is uploaded.
-</p>
 <p class="small">CTRL+P prints each code on its own page.</p>
 
 <details>
   <summary>Decrypt</summary>
   <textarea id="decKey" placeholder="Paste the key here, or scan its code."></textarea>
-  <div class="bar" id="decKeyBar">
+  <div class="bar">
     <button type="button" id="scanDecKey">Scan key with camera</button>
   </div>
-  <div class="bar" id="decBar">
+  <div class="bar">
     <button type="button" id="scanNote">Scan encrypted note with camera</button>
   </div>
   <div class="status" id="decStatus"></div>
@@ -80,6 +76,7 @@
 <script src="jsQR.js"></script>
 <script>
 const ALNUM = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:';   // what a QR code can hold
+const MIN_KEY = 8;   // shortest key accepted for encrypting
 
 // ---------- Minimal QR encoder (error correction level L only) ----------
 // Per-version tables for level L: ECC bytes per block, and number of blocks.
@@ -93,22 +90,14 @@ function rawBytes(v) { // codewords (data + ECC) that fit in version v
 }
 const dataBytes = v => rawBytes(v) - ECC_LEN[v] * BLOCKS[v];
 
-// Text runs -> alphanumeric segments; runs of line breaks -> tiny byte segments.
+// Everything we encode is alphanumeric text with no line breaks: one alphanumeric segment.
 function segmentBits(text, v) {
   const bits = [];
   const put = (val, len) => { for (let i = len - 1; i >= 0; i--) bits.push((val >>> i) & 1); };
-  for (const part of text.split(/(\n+)/)) {
-    if (!part) continue;
-    if (part[0] === '\n') {
-      put(4, 4); put(part.length, v < 10 ? 8 : 16);
-      for (let i = 0; i < part.length; i++) put(10, 8);
-    } else {
-      put(2, 4); put(part.length, v < 10 ? 9 : v < 27 ? 11 : 13);
-      for (let i = 0; i + 1 < part.length; i += 2)
-        put(ALNUM.indexOf(part[i]) * 45 + ALNUM.indexOf(part[i + 1]), 11);
-      if (part.length % 2) put(ALNUM.indexOf(part[part.length - 1]), 6);
-    }
-  }
+  put(2, 4); put(text.length, v < 10 ? 9 : v < 27 ? 11 : 13);
+  for (let i = 0; i + 1 < text.length; i += 2)
+    put(ALNUM.indexOf(text[i]) * 45 + ALNUM.indexOf(text[i + 1]), 11);
+  if (text.length % 2) put(ALNUM.indexOf(text[text.length - 1]), 6);
   return bits;
 }
 
@@ -330,8 +319,13 @@ function randomKeyText(n = 48) {
   return out;
 }
 
-const cleanKey = raw => raw.replace(/[\r\n]+/g, '').trim();   // used exactly as typed otherwise (case matters)
-const qrOk = text => [...text].every(c => ALNUM.indexOf(c) >= 0);
+const cleanKey = raw => raw.replace(/[\r\n]+/g, '').trim().toUpperCase();   // a QR code only holds capitals, so keys are not case sensitive
+function keyProblem(k) {   // '' if the key can be used to encrypt, else a plain message
+  const bad = [...new Set([...k].filter(c => ALNUM.indexOf(c) < 0))];
+  if (bad.length) return "A key can't contain " + bad.map(c => '"' + c + '"').join(' ') + '. Use letters, digits, space and $ % * + - . / :';
+  if (k.length < MIN_KEY) return 'Key is too short (' + k.length + ' characters). It needs at least ' + MIN_KEY + '.';
+  return '';
+}
 
 async function aesKey(keyText, salt, usage) {
   const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(keyText), 'PBKDF2', false, ['deriveKey']);
@@ -364,15 +358,13 @@ async function decryptNote(keyText, cipherText) {   // throws a readable Error
 
 // How many QR characters an encrypted note of this many bytes takes.
 const cipherChars = bytes => { const n = bytes + OVERHEAD; return Math.floor(n / 2) * 3 + (n % 2) * 2; };
-function fits(chars) { try { pickVersion('A'.repeat(chars)); return true; } catch (e) { return false; } }
+const MAX_CHARS = 4296;   // most text one QR code holds (version 40, level L, alphanumeric)
 
 // ---------- Page ----------
-if (typeof document !== 'undefined') (function () {
+(function () {
   const $ = id => document.getElementById(id);
-  const keyBox = $('key'), noteBox = $('note');
-  const keyStatus = $('keyStatus'), statusEl = $('status'), warningEl = $('warning');
-  let keyTimer, noteTimer;
-
+  const keyBox = $('key'), noteBox = $('note'), decKeyBox = $('decKey');
+  const keyStatus = $('keyStatus'), statusEl = $('status'), decStatus = $('decStatus'), warningEl = $('warning');
   const say = (el, msg, bad) => { el.textContent = msg; el.className = 'status' + (bad ? ' bad' : ''); };
 
   // The iPhone Camera reads text that starts like "WORD:" as a link and then says
@@ -386,42 +378,39 @@ if (typeof document !== 'undefined') (function () {
   function showKey() {   // key box -> key QR
     const k = cleanKey(keyBox.value);
     $('noteCode').innerHTML = ''; warningEl.textContent = '';   // a changed key makes the old note code stale
-    if (!k) { $('keyCode').innerHTML = ''; return say(keyStatus, ''); }
-    if (!qrOk(k)) {
-      $('keyCode').innerHTML = '';
-      return say(keyStatus, 'This key works, but it has characters a QR code cannot hold, so there is no key code. A QR code takes A-Z 0-9 space $ % * + - . / : only.', true);
-    }
+    $('keyCode').innerHTML = '';
+    if (!k) return say(keyStatus, '');
+    const problem = keyProblem(k);
+    if (problem) return say(keyStatus, problem, true);
     try {
       const m = makeQr(k);
       $('keyCode').innerHTML = '<div class="code"><div class="label">1. Key (keep separate)</div>' + toSvg(m) + '</div>';
       say(keyStatus, k.length + ' characters -> ' + m.length + 'x' + m.length + ' QR code');
       if (LINKLIKE.test(k)) warningEl.textContent = 'Heads up: the iPhone Camera may not read the key code. Generate a new key.';
-    } catch (e) { $('keyCode').innerHTML = ''; say(keyStatus, 'Key is too long for a QR code.', true); }
+    } catch (e) { say(keyStatus, 'Key is too long for a QR code.', true); }
   }
 
-  $('newKey').addEventListener('click', () => { stopScan(); keyBox.value = randomKeyText(); showKey(); });
-
   // ---- Scan a QR code with the camera (all in this page; no picture is saved or sent) ----
-  // 'key' fills the key box; 'dkey' fills the Decrypt key box; 'note' decrypts the scanned note.
-  let stream = null, scanning = false;
+  let stream = null;
   const frame = document.createElement('canvas'), fctx = frame.getContext('2d', { willReadFrequently: true });
 
   function stopScan() {
-    scanning = false;
-    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    stream = null;
     $('video').srcObject = null;
     $('scanBox').hidden = true;
   }
 
-  async function startScan(kind) {
+  // Shows the camera under the row holding `button`; calls onHit(text) for the first QR code read.
+  async function scan(button, info, what, onHit) {
     stopScan();
-    const info = kind === 'key' ? keyStatus : $('decStatus');   // kinds: key, dkey (Decrypt key), note
-    $({ key: 'keyBar', dkey: 'decKeyBar', note: 'decBar' }[kind]).after($('scanBox'));   // show the camera next to the button used
+    button.parentElement.after($('scanBox'));
     if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia))
       return say(info, 'This browser cannot use the camera on this page. Open it over https://.', true);
     if (typeof jsQR !== 'function') return say(info, 'The QR reader did not load. Reload the page.', true);
+    let mine;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+      mine = stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
     } catch (e) {
       return say(info, e.name === 'NotAllowedError' ? 'Camera permission was denied.' : 'Could not open the camera.', true);
     }
@@ -429,77 +418,66 @@ if (typeof document !== 'undefined') (function () {
     video.srcObject = stream;
     await video.play();
     $('scanBox').hidden = false;
-    scanning = true;
-    say(info, 'Point the camera at the ' + (kind === 'note' ? 'encrypted note' : 'key') + ' QR code.');
+    say(info, 'Point the camera at the ' + what + ' QR code.');
     (function tick() {
-      if (!scanning) return;
+      if (stream !== mine) return;   // stopped or restarted
       if (video.readyState >= 2 && video.videoWidth) {
-        const w = video.videoWidth, h = video.videoHeight;
-        frame.width = w; frame.height = h;
+        const w = frame.width = video.videoWidth, h = frame.height = video.videoHeight;
         fctx.drawImage(video, 0, 0, w, h);
         const hit = jsQR(fctx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: 'dontInvert' });
-        if (hit && hit.data) {
-          stopScan();
-          if (kind === 'key') {
-            keyBox.value = cleanKey(hit.data);
-            showKey();
-            keyStatus.textContent = 'Key imported from the camera. ' + keyStatus.textContent;
-          } else if (kind === 'dkey') {
-            $('decKey').value = cleanKey(hit.data);
-            say(info, 'Key scanned.');
-          } else {
-            say(info, 'Encrypted note scanned.');
-            decrypt(hit.data);
-          }
-          return;
-        }
+        if (hit && hit.data) { stopScan(); return onHit(hit.data); }
       }
       requestAnimationFrame(tick);
     })();
   }
 
-  $('scanKey').addEventListener('click', () => startScan('key'));
-  $('scanDecKey').addEventListener('click', () => startScan('dkey'));
-  $('scanNote').addEventListener('click', () => startScan('note'));
-  $('stopScan').addEventListener('click', () => { stopScan(); say(keyStatus, ''); say($('decStatus'), ''); });
-  keyBox.addEventListener('input', () => { clearTimeout(keyTimer); keyTimer = setTimeout(showKey, 200); });
+  $('newKey').onclick = () => { stopScan(); keyBox.value = randomKeyText(); showKey(); };
+  keyBox.oninput = showKey;
+
+  $('scanKey').onclick = () => scan($('scanKey'), keyStatus, 'key', text => {
+    keyBox.value = cleanKey(text);
+    showKey();
+    keyStatus.textContent = 'Key imported from the camera. ' + keyStatus.textContent;
+  });
+  $('scanDecKey').onclick = () => scan($('scanDecKey'), decStatus, 'key', text => {
+    decKeyBox.value = cleanKey(text);
+    say(decStatus, 'Key scanned.');
+  });
+  $('scanNote').onclick = () => scan($('scanNote'), decStatus, 'encrypted note', async text => {
+    say(decStatus, 'Encrypted note scanned.');
+    const out = $('plain');
+    try { out.textContent = await decryptNote(cleanKey(decKeyBox.value), text); out.className = ''; }
+    catch (e) { out.textContent = e.message; out.className = 'bad'; }
+  });
+  $('stopScan').onclick = () => { stopScan(); say(keyStatus, ''); say(decStatus, ''); };
 
   function check() {   // live "does it fit" check for the note
-    const bytes = new TextEncoder().encode(noteBox.value).length, chars = cipherChars(bytes);
-    say(statusEl, bytes + ' bytes -> ' + chars + ' characters when encrypted' + (fits(chars) ? ' (max about 4296)' : ' - too long, trim it.'), !fits(chars));
+    const bytes = new TextEncoder().encode(noteBox.value).length, chars = cipherChars(bytes), ok = chars <= MAX_CHARS;
+    say(statusEl, bytes + ' bytes -> ' + chars + ' characters when encrypted' + (ok ? ' (max ' + MAX_CHARS + ')' : ' - too long, trim it.'), !ok);
   }
 
   async function generate() {
-    clearTimeout(noteTimer); clearTimeout(keyTimer);
     showKey();   // make sure the key code matches the key box right now
-    const k = cleanKey(keyBox.value), note = noteBox.value;
-    warningEl.textContent = '';
-    if (!k) { $('noteCode').innerHTML = ''; return say(statusEl, 'Generate or paste a key first.', true); }
-    if (!note) { $('noteCode').innerHTML = ''; return say(statusEl, 'Nothing to encrypt.', true); }
-    if (!fits(cipherChars(new TextEncoder().encode(note).length))) { $('noteCode').innerHTML = ''; return say(statusEl, 'Too long to fit in one QR code - trim it.', true); }
+    const k = cleanKey(keyBox.value), note = noteBox.value, code = $('noteCode');
+    warningEl.textContent = ''; code.innerHTML = '';
+    if (!k) return say(statusEl, 'Generate or paste a key first.', true);
+    if (keyProblem(k)) return say(statusEl, 'Fix the key first (see above).', true);
+    if (!note) return say(statusEl, 'Nothing to encrypt.', true);
+    if (cipherChars(new TextEncoder().encode(note).length) > MAX_CHARS) return say(statusEl, 'Too long to fit in one QR code - trim it.', true);
     say(statusEl, 'Encrypting...');
     try {
       const text = await encryptNote(k, note), m = makeQr(text);
-      $('noteCode').innerHTML = '<div class="code"><div class="label">2. Encrypted note</div>' + toSvg(m) + '</div>';
+      code.innerHTML = '<div class="code"><div class="label">2. Encrypted note</div>' + toSvg(m) + '</div>';
       warningEl.textContent = LINKLIKE.test(text) ? 'Heads up: the iPhone Camera may not read this code. Press Encrypt again for a different one.' : '';
       say(statusEl, text.length + ' characters -> ' + m.length + 'x' + m.length + ' QR code');
-    } catch (e) { $('noteCode').innerHTML = ''; say(statusEl, 'Encryption failed: ' + e.message, true); }
+    } catch (e) { say(statusEl, 'Encryption failed: ' + e.message, true); }
   }
 
-  $('make').addEventListener('click', generate);
-
+  $('make').onclick = generate;
   // Enter adds a line break as usual; Shift+Enter (or the button) encrypts.
   noteBox.placeholder = 'Type a note. Shift+Enter encrypts it.';
-  noteBox.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && e.shiftKey && !e.isComposing) { e.preventDefault(); generate(); }
-  });
-  noteBox.addEventListener('input', () => { clearTimeout(noteTimer); noteTimer = setTimeout(check, 150); });
-
-  async function decrypt(cipherText) {
-    const out = $('plain');
-    try { out.textContent = await decryptNote(cleanKey($('decKey').value), cipherText); out.className = ''; }
-    catch (e) { out.textContent = e.message; out.className = 'bad'; }
-  }
+  noteBox.onkeydown = e => { if (e.key === 'Enter' && e.shiftKey && !e.isComposing) { e.preventDefault(); generate(); } };
+  noteBox.oninput = check;
 
   check();
 })();
